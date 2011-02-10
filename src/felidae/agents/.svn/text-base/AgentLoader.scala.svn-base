@@ -1,0 +1,26 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae.agents
+
+
+import felidae.GameState
+
+class AgentLoader {
+    def load(code : Map[String, String], gameState : GameState) : Agent = {
+        try {
+            val stackTrace = Thread.currentThread().getStackTrace()
+            val mainClass = stackTrace(stackTrace.length-1).getClassName
+            val theClass = Class.forName(mainClass.substring(0, mainClass.indexOf(".")) + ".actors." + code.get("Role"))
+            val constructor = theClass.getConstructor(Map.getClass, gameState.getClass)
+            constructor.newInstance(code, gameState).asInstanceOf[Agent]
+        } catch {
+            case ex : Exception => System.err.println(ex);
+        }
+        return null;
+    }
+    
+    def base(gameState : GameState) : List[Agent] = Nil
+}

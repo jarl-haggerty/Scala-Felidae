@@ -1,0 +1,65 @@
+package felidae.audio;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.SourceDataLine;
+
+object Stream {
+    val BUFFER_SIZE = 4096*8
+}
+
+class Stream(val fileName : String, var loop : Boolean) {
+    var stream = new OggInputStream(new FileInputStream(fileName))
+    val format = new AudioFormat(stream.getRate(), 16, if(stream.getFormat == OggInputStream.FORMAT_MONO16) 1 else 2, true, false)
+    val line : SourceDataLine = {
+        val info = new DataLine.Info(SourceDataLine.getClass, format)
+        AudioSystem.getLine(info).asInstanceOf[SourceDataLine]
+    }
+    line.open(format)
+    val data = new Array[Byte](BUFFER_SIZE)
+    
+    def rewind = {
+        line.drain
+        stream.close
+        stream = new OggInputStream(new FileInputStream(fileName))
+    }
+
+    def playing = line.isActive
+    
+    def play = line.start
+    
+    def update = {
+        var read = 0
+        try {
+            read = stream.read(data, 0, data.length)
+        } catch {
+            case e : IOException => {
+                e.printStackTrace
+                return false
+            }
+        }
+        if(read != -1){
+            line.write(data, 0, read)
+            return true
+        } else if(loop) {
+            try {
+                rewind
+            } catch {
+                case e : Exception => {
+                    e.printStackTrace
+                    return false
+                }
+            }
+            return true
+        } else {
+            return false
+        }
+    }
+}
+

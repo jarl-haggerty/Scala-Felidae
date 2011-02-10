@@ -1,0 +1,77 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae
+
+import felidae.logging.Logger
+import felidae.graphics.Graphics
+import felidae.audio.Audio
+import felidae.scripting.Scripting
+
+import felidae.agents.AgentLoader
+import org.python.core.PyDictionary
+
+import java.lang.Math._
+
+class Game(val title : String, val agentLoader : AgentLoader) {
+    private var _gameState : GameState = null
+    def gameState : Option[GameState] = if(_gameState == null) None else Some(_gameState)
+    def gameState_=(input : String) = nextState = Some(input)
+    
+    var delta : Float = 0
+    var speed : Float = 1
+    var FPS : Float = 0
+    var debug : Boolean = false
+    var running : Boolean = false
+    var nextState : Option[String] = None
+    var data : PyDictionary = new PyDictionary
+    val logger = new Logger
+    val graphics = new Graphics(this)
+    val audio = new Audio
+    val scripting = new Scripting(this)
+    
+    def run(entryPoint : String) : Unit = {
+        running = true
+        notify
+        
+        val initial = GameState(entryPoint, agentLoader, this)
+        initial.initialize
+        _gameState = initial
+        while(running){
+            val time = System.currentTimeMillis
+            delta = speed/60
+            if(graphics.active) _gameState.update
+            try {
+            	val sleepTime = max(0, 1000/60 - (System.currentTimeMillis - time))
+				Thread.sleep(sleepTime)
+				FPS = 1000f/sleepTime
+			} catch {
+			    case e => e.printStackTrace
+			}
+			nextState match {
+			    case Some(name) => {
+			        _gameState = null
+                    graphics.clearMemory
+                    audio.clearMemory
+                    val next = GameState(entryPoint, agentLoader, this)
+                    next.initialize
+                    _gameState = next
+                    nextState = None
+                }
+                case None => {}
+            }
+        }
+        shutdown
+    }
+    
+    def shutdown() : Unit = {
+        scripting.destroy
+        graphics.destroy
+        audio.destroy
+        logger.destroy
+    }
+    
+    def quit = running = false
+}

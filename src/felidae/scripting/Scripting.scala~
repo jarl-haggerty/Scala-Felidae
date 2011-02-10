@@ -1,0 +1,150 @@
+package felidae.scripting;
+
+import java.awt.Color;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+
+import org.lwjgl.input.Keyboard;
+import org.python.core.PyBoolean;
+import org.python.core.PyFunction;
+import org.python.util.PythonInterpreter;
+
+import felidae.Game;
+import felidae.audio.Audio;
+import felidae.graphics.Graphics;
+import felidae.logging.FelidaeStream;
+import felidae.logging.Logger;
+
+import util.control.Breaks.breakable
+import util.control.Breaks.break
+
+class Scripting(val game : Game) {
+    val console = new Console(game)
+    println("Felidae 1.0")
+    game.graphics.desktop.add(console)
+    console.setVisible(false)
+    console.setPosition(0, 0)
+    console.setSize(game.graphics.desktop.getWidth/2, game.graphics.desktop.getHeight/2)
+    
+    var lastTilde = false
+    var secondLastTilde = false
+    var nextFunction = 0
+    var nextInt = 0
+    var initialized = false
+    
+    val interp = new PythonInterpreter
+    interp.setOut(game.logger.out)
+    interp.setErr(game.logger.err)
+    interp.set("Game", game)
+    interp.set("Graphics", game.graphics)
+    interp.set("Sound", game.audio)
+    interp.set("true", new PyBoolean(true))
+    interp.set("false", new PyBoolean(false))
+    initialized = true
+    game.logger.out.console = console
+    game.logger.err.console = console
+
+    def runString(toRun : String) = {
+        if(toRun.length >= 6 && toRun.substring(0, 6).equals("import")){
+            System.err.println("No importing allowed!")
+        }
+        try{
+            interp.exec(toRun)
+        }catch{
+            case e : Exception => e.printStackTrace
+        }
+    }
+
+    def compile(script : String) : Map[String, PyFunction] = {
+        if(script.matches(".+\\.py$")){
+            return compile(new File(script));
+        }else{
+            var functionName = ""
+            var temp = nextFunction
+            nextFunction += 1
+            while(temp != 0){
+                functionName += ((temp % 27) + 97).asInstanceOf[Char]
+                temp -= temp % 27;
+                temp /= 27;
+            }
+            val code = "def " + functionName + "()\n\t" + script;
+            game.logger.out.println("Compiling:\n" + code, Color.blue)
+            interp.exec(code)
+            return Map[String, PyFunction]("" -> interp.get(functionName).asInstanceOf[PyFunction])
+        }
+    }
+
+    def compile(file : File) : Map[String, PyFunction] = {
+        try {
+            val reader = new BufferedReader(new FileReader(file))
+            var mappings : List[(String, PyFunction)] = Nil
+            var contents = ""
+            var line = ""
+            var functionName = getUniqueString
+            var originalName = ""
+            
+            def map = {
+                game.logger.out.println("Compiling:\n" + contents, Color.blue)
+                interp.exec(contents)
+                mappings = originalName -> interp.get(functionName).asInstanceOf[PyFunction] :: mappings
+            }
+            
+            while ((line = reader.readLine) != null) {
+                if(line.matches("^def\\s+\\S+\\([^\\)]*\\):")){
+                    if(originalName.nonEmpty){
+                        map
+                        contents = ""
+                        functionName = getUniqueString
+                    }
+                    originalName = line.split("\\s+")(1)
+                    originalName = originalName.substring(0, originalName.indexOf("("))
+                    contents += "def " + functionName + line.substring(line.indexOf("(")) + "\n"
+                }else{
+                    contents += line + "\n"
+                }
+            }
+            map
+            return Map.empty[String, PyFunction] ++ mappings
+        } catch {
+            case e : IOException => {
+                e.printStackTrace
+                return null
+            }
+        }
+    }
+
+    def getUniqueString : String = {
+        var functionName = "";
+        var temp = nextFunction
+        nextFunction += 1
+        breakable {
+            while(true){
+                functionName += ((temp % 27) + 97).asInstanceOf[Char]
+                temp -= temp % 27
+                temp /= 27
+                if(temp == 0) break
+            }
+        }
+        return functionName
+    }
+
+    def exec(file : File) =  try {
+        interp.execfile(new FileInputStream(file))
+    } catch {
+        case e : FileNotFoundException => e.printStackTrace
+    }
+
+    def getUniqueInt(name : String) : Int = {
+        interp.exec(name + " = " + nextInt)
+        nextInt += 1
+        return interp.get(name).asInt
+    }
+
+    def update(name : String, item : Object) = interp.set(name, item)
+
+    def destroy = if(interp != null) interp.cleanup
+}

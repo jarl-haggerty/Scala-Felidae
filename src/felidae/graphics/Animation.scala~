@@ -1,0 +1,21 @@
+class Animation(val sheetFileName : String, val numRows : Int, val numColumns : Int, val numCells : Int, val period : Float, val startCell : Int = 0) {
+    val sheet = Graphics.loadTexture(sheetFileName)
+    var time : Float = 0
+    val cellWidth = 1f / numColumns
+    val cellHeight = 1f / numRows
+    val effects = Effects
+    
+    def update : Unit = {
+        time += Game.delta
+        val periodsPassed : Int = (time / period)
+        time = time % period;
+        cell = (cell + periodsPassed) % numCells
+    }
+    
+    def draw(volume : Rectangle, cellOffset : Int = 0) : Unit = {
+        val x = ((cell+cellOffset) % numCells) % numColumns
+        val y = ((cell+cellOffset) % numCells) / numColumns
+
+        Graphics.drawTexture(sheet, volume, Rectangle(cellWidth*x, cellHeight*y, cellWidth, cellHeight), effects)
+    }
+}

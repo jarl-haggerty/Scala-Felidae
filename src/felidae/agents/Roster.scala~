@@ -1,0 +1,20 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae.actors
+
+class Roster(val map : Map[String, Agent]){
+    override def updated(name : String, agent : Agent) = new Roster(map(name) = agent)
+    override def apply(name : String) = map(name)
+    override def +=(agent : Agent) : Roster = {
+        val name = "Anonymous" + Roster.anonymous
+        Roster.anonymous += 1
+        updated(name, agent)
+    }
+}
+
+object Roster {
+    var anonymous = 0
+}

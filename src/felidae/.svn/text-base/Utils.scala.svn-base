@@ -1,0 +1,52 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae
+
+import scala.collection.immutable.HashMap
+import scala.xml.Node
+import scala.xml.NodeSeq
+import scala.xml.XML.loadString
+import scala.xml.Elem
+
+object Utils {
+    def parseCode(root : Node) : Map[String, String] = {
+        var mappings : List[(String, String)] = Nil
+        for(a <- root.child if a.isInstanceOf[Elem]){
+            if(a.child.length > 0) {
+                mappings = (a.label, a.child(0).text) :: mappings
+            } else {
+                mappings = (a.label, "") :: mappings
+            }
+        }
+        Map.empty[String, String] ++ mappings
+    }
+
+    def parseCode(lines : Iterator[String]) : Map[String, String] = {
+        var mappings : List[(String, String)] = Nil
+        for(a <- lines){
+            val temp = a.split("=")
+            (temp(0), temp(1)) :: mappings
+        }
+        Map.empty[String, String] ++ mappings
+    }
+    
+    def packageCode(code : Map[String, String]) : Node = {
+        val name = if(code("Name").nonEmpty) code("Name") else "Anonymous"
+        val base = "<" + name + "></" + name + ">"
+        var elements = ""
+        for((key, value) <- code) { 
+            if(value.nonEmpty) {
+                elements += "    <" + key + ">" + value + "</" + key + ">"
+            } else {
+                elements += "    <" + key + "/>"
+            }
+        }
+        return loadString("<" + name + ">" + elements + "</" + name + ">")
+    }
+
+    def implies(x : Boolean, y : Boolean) = !x || y
+    def validKey(map : Map[String, String], key : String) = map.contains(key) && map(key).nonEmpty
+}

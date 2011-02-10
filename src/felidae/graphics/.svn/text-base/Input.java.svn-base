@@ -1,0 +1,18 @@
+package felidae.graphics;
+
+import java.awt.Point;
+
+import net.java.games.input.Controller;
+import net.java.games.input.Event;
+
+public class Input {
+	public Point cursor;
+	public Event event;
+	public Controller controller;
+	
+	public Input(Point cursor, Controller controller, Event event) {
+		this.cursor = cursor;
+		this.event = event;
+		this.controller = controller;
+	}
+}

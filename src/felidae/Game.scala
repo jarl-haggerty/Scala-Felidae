@@ -1,0 +1,107 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae
+
+import felidae.logging.Logger
+import felidae.graphics.Graphics
+import felidae.audio.Audio
+import felidae.scripting.Scripting
+
+import felidae.agents.AgentLoader
+import org.python.core.PyDictionary
+
+import java.lang.Math._
+
+class Game(val title : String, val agentLoader : AgentLoader) {
+    private var _gameState : GameState = null
+    def gameState : Option[GameState] = if(_gameState == null) None else Some(_gameState)
+    def gameState_=(input : String) = nextState = Some(input)
+    
+    var delta : Float = 0
+    var speed : Float = 1
+    var FPS : Float = 60
+    var debug : Boolean = false
+    var running : Boolean = true
+    var nextState : Option[String] = None
+    var data : PyDictionary = new PyDictionary
+    val (logger, graphics, audio, scripting) : (Logger, Graphics, Audio, Scripting) = try {
+        (null, new Graphics(this), new Audio, null)
+    } catch {
+        case e => {
+            shutdown
+            running = false
+            throw e
+        }
+    }
+    
+    def run(entryPoint : String) : Unit = {
+        if(!running) throw new Exception("Game not successfully initialized")
+        graphics.synchronized {graphics.notify}
+        try {
+            val initial = GameState(entryPoint, agentLoader, this)
+            initial.initialize
+            _gameState = initial
+            var time = 0f
+            var frames = 0
+            var startTime = 0l
+            var lastTime = System.currentTimeMillis
+            var fpsUpdateTime = System.currentTimeMillis
+            while(running){
+                if(graphics.error != null) {
+                    println("Graphics Error")
+                    throw graphics.error
+                }
+                
+                startTime = System.currentTimeMillis
+                Thread.sleep(max(0, 1000/60 - (startTime - lastTime)))
+                lastTime = System.currentTimeMillis
+                frames += 1
+
+                if(System.currentTimeMillis - fpsUpdateTime > 1000) {
+                    FPS = frames*1000f/(System.currentTimeMillis - fpsUpdateTime)
+                    frames = 0
+                    fpsUpdateTime = System.currentTimeMillis
+                }
+                
+
+                delta = speed/FPS
+                if(graphics.active) _gameState.update
+
+                nextState match {
+                    case Some(name) => {
+                        _gameState = null
+                        graphics.clearMemory
+                        audio.clearMemory
+                        val next = GameState(entryPoint, agentLoader, this)
+                        next.initialize
+                        _gameState = next
+                        nextState = None
+                    }
+                    case None => {}
+                }
+            }
+        } catch {
+            case e => {
+                    e.printStackTrace
+                    println("Calling Shutdown")
+                    shutdown
+                    throw e
+            }
+        }
+        println("Calling Shutdown")
+        shutdown
+    }
+    
+    def shutdown() : Unit = {
+        //scripting.destroy
+        println("Shutdown")
+        if(graphics != null) graphics.destroy
+        if(audio != null) audio.destroy
+        //logger.destroy
+    }
+    
+    def quit = running = false
+}

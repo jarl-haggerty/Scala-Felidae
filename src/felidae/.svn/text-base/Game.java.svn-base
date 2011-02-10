@@ -1,0 +1,172 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+package felidae;
+
+import java.awt.Color;
+
+import net.java.games.input.Component;
+import net.java.games.input.Controller;
+import net.java.games.input.ControllerEnvironment;
+import net.java.games.input.Event;
+import net.java.games.input.EventQueue;
+
+import org.python.core.PyDictionary;
+import felidae.actors.ActorLoader;
+import felidae.actors.Cast;
+import felidae.audio.Audio;
+import felidae.graphics.Graphics;
+import felidae.input.Input;
+import felidae.logging.Logger;
+import felidae.scripting.Scripting;
+
+/**
+ *
+ * @author Jarl
+ */
+public class Game {
+    public static GameState currentState;
+
+    public static float delta, lastTime, speed;
+
+    public static boolean debugging, running;
+    public static String nextState;
+
+    public static ActorLoader actorLoader;
+    public static PyDictionary data;
+    public static Cast actors;
+    public static String title;
+    public static float time, FPS;
+
+    public static void initialize(ActorLoader actorLoader, String title){
+        Game.title = title;
+        Game.actorLoader = actorLoader;
+        Game.speed = 1;
+        running = true;
+        
+        running &= Logger.initialize();
+        if(!running){
+            return;
+        }
+        running &= Graphics.initialize();
+        if(!running){
+            return;
+        }
+        running &= Audio.initialize();
+        if(!running){
+            return;
+        }
+        running &= Scripting.initialize();
+        if(!running){
+            return;
+        }
+        //running &= Input.initialize();
+        if(!running){
+            return;
+        }
+        debugging = false;
+        data = new PyDictionary();
+    }
+
+    public static void run(String entryPoint){
+        if(!running){
+            shutdown();
+            return;
+        }
+
+        delta = 0;
+
+        nextState = null;
+        GameState temp = new GameState(entryPoint, actorLoader);
+        temp.initialize();
+        currentState = temp;
+        
+        time = 0;
+        FPS = 0;
+        int framesThrown = 0, frames = 0;
+        long lastTime = -1;
+        while(running){
+        	long time = System.currentTimeMillis();
+            
+            delta = speed/60;
+            
+            if(Graphics.active){
+	            currentState.update();
+            }
+            
+//            frames++;
+//            if(time >= 1){
+//            	FPS = frames/time;
+//            	time = 0;
+//            	frames = 0;
+//            }
+            //Graphics.setColor(Color.white);
+            //Graphics.drawStringOnView(String.valueOf(FPS), 0, 20);
+            
+            try {
+            	long sleepTime = Math.max(0, 1000/60 - (System.currentTimeMillis() - time));
+				Thread.sleep(sleepTime);
+				FPS = 1000f/sleepTime;
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+            
+            //GameGraphics.drawString(String.valueOf(time), 0, 100);
+            //Graphics.drawString(String.valueOf(framesThrown), 0, 300);
+
+            if(nextState != null){
+                //break;
+            	currentState = null;
+                Graphics.clearMemory();
+                Audio.clearMemory();
+                temp = new GameState(entryPoint, actorLoader);
+                temp.initialize();
+                currentState = temp;
+                time = 0;
+                nextState = null;
+            }
+        }
+
+        shutdown();
+    }
+
+    public static void shutdown(){
+        Scripting.destroy();
+        Graphics.destroy();
+        Audio.destroy();
+        Logger.destroy();
+    }
+
+    public static GameState getCurrentState(){
+        return currentState;
+    }
+
+    public static void setCurrentState(GameState state){
+        currentState = state;
+    }
+
+    public static float getElapsedTime(){
+        return delta;
+    }
+
+    /**
+     * @return the debugging
+     */
+    public static boolean isDebugging() {
+        return debugging;
+    }
+
+    /**
+     * @param aDebugging the debugging to set
+     */
+    public static void setDebugging(boolean aDebugging) {
+        debugging = aDebugging;
+    }
+
+    public static void quit(){
+        running = false;
+    }
+}
